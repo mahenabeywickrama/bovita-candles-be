@@ -12,7 +12,7 @@ export interface IUser extends Document {
   lastname: string
   email: string
   password: string
-  roles: Role
+  role: Role
 }
 
 const userSchema = new Schema<IUser>({
@@ -20,7 +20,7 @@ const userSchema = new Schema<IUser>({
   lastname: { type: String, required: true },
   email: { type: String, unique: true, lowercase: true },
   password: { type: String, required: true },
-  roles: { type: String, enum: Object.values(Role), default: Role.USER }
+  role: { type: String, enum: Object.values(Role), default: Role.USER }
 })
 
 export const User = mongoose.model<IUser>("User", userSchema)
