@@ -31,7 +31,7 @@ export const authenticate = (
 
 export const isAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
     console.error("Checking admin role for user:", req.user);
-    if (req.user.role.includes("ADMIN")) {
+    if (req.user?.role === "ADMIN") {
         next();
     } else {
         res.status(403).json({ message: "Forbidden: Admins only" });
