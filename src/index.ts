@@ -1,6 +1,7 @@
 import express from "express"
 import cors from "cors"
 import authRouter from "./routes/auth.routes"
+import productRouter from "./routes/product.routes"
 import dotenv from "dotenv"
 import mongoose from "mongoose"
 dotenv.config()
@@ -19,6 +20,7 @@ app.use(
 )
 
 app.use("/api/v1/auth", authRouter)
+app.use("/api/v1/product", productRouter)
 
 mongoose
   .connect(MONGO_URI)
