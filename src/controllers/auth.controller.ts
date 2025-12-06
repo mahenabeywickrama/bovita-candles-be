@@ -5,7 +5,6 @@ import { signAccessToken, signRefreshToken } from "../utils/tokens"
 import { AuthRequest } from "../middleware/auth"
 import jwt from "jsonwebtoken"
 import dotenv from "dotenv"
-import { json } from "stream/consumers"
 dotenv.config()
 
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string
@@ -41,10 +40,7 @@ export const register = async (req: Request, res: Response) => {
     await newUser.save()
 
     res.status(201).json({
-      message:
-        role === Role.AUTHOR
-          ? "Author registered successfully. waiting for approvel"
-          : "User registered successfully",
+      message: "User registered successfully",
       data: {
         id: newUser._id,
         email: newUser.email,
@@ -173,3 +169,119 @@ export const handleRefreshToken = async (req: Request, res: Response) => {
     res.status(403).json({ message: "Invalid or expire token" })
   }
 }
+
+export const getAllUsers = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.ADMIN) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const users = await User.find().select("-password");
+
+    res.status(200).json({
+      message: "Users fetched successfully",
+      data: users
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message });
+  }
+};
+
+export const getUserById = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.ADMIN) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const userId = req.params.id;
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User fetched successfully",
+      data: user
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message });
+  }
+};
+
+export const updateUser = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.ADMIN) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const userId = req.params.id;
+    const { firstname, lastname, email, role } = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { firstname, lastname, email, role },
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User updated successfully",
+      data: updatedUser
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message });
+  }
+};
+
+export const disableUser = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.ADMIN) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const userId = req.params.id;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { isActive: false },
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User disabled successfully",
+      data: updatedUser
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message });
+  }
+};
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.ADMIN) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const userId = req.params.id;
+
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User deleted successfully"
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message });
+  }
+};

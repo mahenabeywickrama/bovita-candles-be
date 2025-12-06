@@ -1,4 +1,3 @@
-import { IO } from "inspector/promises";
 import mongoose, { Schema, Document } from "mongoose";
 
 interface IOrderProduct {
