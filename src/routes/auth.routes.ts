@@ -1,7 +1,6 @@
 import { Router } from "express"
 import {
   deleteUser,
-  disableUser,
   getAllUsers,
   getMyDetails,
   getUserById,
@@ -9,6 +8,7 @@ import {
   login,
   register,
   registerAdmin,
+  toggleUserStatus,
   updateUser
 } from "../controllers/auth.controller"
 import { authenticate, isAdmin } from "../middleware/auth"
@@ -32,7 +32,7 @@ router.post("/admin/register", authenticate, isAdmin, registerAdmin)
 router.get("/admin/users", authenticate, isAdmin, getAllUsers);
 router.get("/admin/users/:id", authenticate, isAdmin, getUserById);
 router.put("/admin/users/:id", authenticate, isAdmin, updateUser);
-router.patch("/admin/users/:id/disable", authenticate, isAdmin, disableUser);
+router.patch("/admin/users/:id/toggle", authenticate, isAdmin, toggleUserStatus);
 router.delete("/admin/users/:id", authenticate, isAdmin, deleteUser);
 
 export default router

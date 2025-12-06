@@ -97,11 +97,11 @@ export const getMyDetails = async (req: AuthRequest, res: Response) => {
     })
   }
 
-  const { firstname, lastname, email, role } = user
+  const { firstname, lastname, email, role, isActive } = user
 
   res.status(200).json({
     message: "Ok",
-    data: { firstname, lastname, email, role }
+    data: { firstname, lastname, email, role, isActive }
   })
 }
 
@@ -237,7 +237,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const disableUser = async (req: AuthRequest, res: Response) => {
+export const toggleUserStatus = async (req: AuthRequest, res: Response) => {
   try {
     if (req.user?.role !== Role.ADMIN) {
       return res.status(403).json({ message: "Access denied" });
@@ -245,19 +245,18 @@ export const disableUser = async (req: AuthRequest, res: Response) => {
 
     const userId = req.params.id;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { isActive: false },
-      { new: true }
-    ).select("-password");
-
-    if (!updatedUser) {
+    const user = await User.findById(userId);
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Toggle isActive
+    user.isActive = !user.isActive;
+    await user.save();
+
     res.status(200).json({
-      message: "User disabled successfully",
-      data: updatedUser
+      message: user.isActive ? "User enabled successfully" : "User disabled successfully",
+      data: user
     });
   } catch (err: any) {
     res.status(500).json({ message: err?.message });
