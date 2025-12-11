@@ -83,3 +83,100 @@ export const getAllProducts = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch products" })
   }
 }
+
+// UPDATE PRODUCT
+export const updateProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Forbidden: Admins only" })
+    }
+
+    const productId = req.params.id;
+    const { title, description, category, fragrance, size, price, stock } = req.body;
+
+    const files = req.files as Express.Multer.File[];
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    let imageUrls = product.imageUrls;
+
+    // If user uploads new images → replace them
+    if (files && files.length > 0) {
+      imageUrls = [];
+
+      for (const file of files) {
+        const result: any = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "bovita-candles" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          stream.end(file.buffer);
+        });
+
+        imageUrls.push(result.secure_url);
+      }
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      {
+        title,
+        description,
+        category,
+        fragrance,
+        size,
+        price,
+        stock,
+        imageUrls,
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      message: "Product updated",
+      product: updatedProduct,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// DELETE PRODUCT
+export const deleteProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Forbidden: Admins only" });
+    }
+
+    const productId = req.params.id;
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Delete images from Cloudinary
+    for (const imageUrl of product.imageUrls) {
+      const publicId = imageUrl.split("/").pop()?.split(".")[0];
+      if (publicId) {
+        await cloudinary.uploader.destroy(`bovita-candles/${publicId}`);
+      }
+    }
+
+    await Product.findByIdAndDelete(productId);
+
+    return res.status(200).json({ message: "Product deleted" });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

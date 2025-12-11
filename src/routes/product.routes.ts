@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { getAllProducts, saveProduct } from "../controllers/product.controller"
+import { deleteProduct, getAllProducts, saveProduct, updateProduct } from "../controllers/product.controller"
 import { authenticate, isAdmin } from "../middleware/auth"
 import { upload } from "../middleware/upload"
 
@@ -14,5 +14,7 @@ router.post(
 )
 
 router.get("/", getAllProducts)
+router.put("/:id", authenticate, isAdmin, upload.array("images"), updateProduct);
+router.delete("/:id", authenticate, isAdmin, deleteProduct);
 
 export default router
