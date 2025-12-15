@@ -22,7 +22,7 @@ app.use(
 
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/product", productRouter)
-app.use("/api/v1/order", orderRouter)
+app.use("/api/v1/orders", orderRouter)
 
 mongoose
   .connect(MONGO_URI)

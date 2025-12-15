@@ -5,8 +5,9 @@ import { authenticate, isAdmin } from "../middleware/auth"
 const router = Router()
 
 router.post(
-  "/saveOrder",
+  "/create",
   authenticate,
+  isAdmin,
   saveOrder
 )
 
