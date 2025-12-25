@@ -54,3 +54,72 @@ export const saveOrder = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Internal server error" })
   }
 }
+
+export const getAllOrders = async (req: Request, res: Response) => {
+  try {
+    const { status, page = "1", limit = "5" } = req.query
+
+    const filter: any = {}
+
+    if (status && status !== "ALL") {
+      filter.status = status
+    }
+
+    const pageNumber = parseInt(page as string)
+    const pageSize = parseInt(limit as string)
+    const skip = (pageNumber - 1) * pageSize
+
+    const totalOrders = await Order.countDocuments(filter)
+
+    const orders = await Order.find(filter)
+      .populate("user", "email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize)
+
+    res.json({
+      orders,
+      totalPages: Math.ceil(totalOrders / pageSize),
+      currentPage: pageNumber
+    })
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch orders" })
+  }
+}
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params
+    const { status } = req.body
+
+    const order = await Order.findById(orderId)
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    order.status = status
+    await order.save()
+
+    res.json(order)
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update status" })
+  }
+}
+
+// order.controller.ts
+export const getOrderById = async (req: Request, res: Response) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("user", "name email")
+      .populate("products.product", "imageUrls")
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    res.json(order)
+  } catch (err) {
+    res.status(500).json({ message: "Server error" })
+  }
+}

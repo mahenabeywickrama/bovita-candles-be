@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { saveOrder } from "../controllers/order.controller"
+import { getAllOrders, getOrderById, saveOrder, updateOrderStatus } from "../controllers/order.controller"
 import { authenticate, isAdmin } from "../middleware/auth"
 
 const router = Router()
@@ -7,8 +7,18 @@ const router = Router()
 router.post(
   "/create",
   authenticate,
-  isAdmin,
   saveOrder
 )
+
+// GET /orders?status=PENDING&page=1&limit=5
+router.get("/", authenticate, isAdmin, getAllOrders)
+// order.routes.ts
+router.get(
+  "/:id",
+  authenticate,
+  isAdmin,
+  getOrderById
+)
+router.put("/:orderId/status", authenticate, isAdmin, updateOrderStatus)
 
 export default router
