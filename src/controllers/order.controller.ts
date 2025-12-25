@@ -1,7 +1,8 @@
 import { Request, Response } from "express"
-import { Order } from "../models/Order"
+import { Order, Status } from "../models/Order"
 import { AuthRequest } from "../middleware/auth"
 import { Product } from "../models/Product";
+import { User } from "../models/User";
 
 export const saveOrder = async (req: AuthRequest, res: Response) => {
   try {
@@ -121,5 +122,89 @@ export const getOrderById = async (req: Request, res: Response) => {
     res.json(order)
   } catch (err) {
     res.status(500).json({ message: "Server error" })
+  }
+}
+
+export const getDashboardStats = async (_req: Request, res: Response) => {
+  try {
+    const totalOrders = await Order.countDocuments()
+    const pendingOrders = await Order.countDocuments({ status: Status.PENDING })
+    const customers = await User.countDocuments({ role: "USER" })
+
+    const revenueAgg = await Order.aggregate([
+      { $match: { status: Status.CONFIRMED } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+    ])
+
+    const revenue = revenueAgg[0]?.total || 0
+
+    const recentOrders = await Order.find()
+      .populate("user", "email")
+      .sort({ createdAt: -1 })
+      .limit(5)
+
+    const last7Days = new Date()
+    last7Days.setDate(last7Days.getDate() - 6)
+    last7Days.setHours(0, 0, 0, 0)
+
+    // Orders per day
+    const ordersPerDay = await Order.aggregate([
+      {
+        $match: { createdAt: { $gte: last7Days } }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ])
+
+    // Revenue per day
+    const revenuePerDay = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: last7Days },
+          status: Status.CONFIRMED
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          total: { $sum: "$totalAmount" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ])
+
+    // Status breakdown
+    const statusBreakdown = await Order.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ])
+
+    res.json({
+      totalOrders,
+      pendingOrders,
+      customers,
+      revenue,
+      recentOrders,
+      ordersPerDay,
+      revenuePerDay,
+      statusBreakdown
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "Dashboard fetch failed" })
   }
 }
