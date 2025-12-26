@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { getAllOrders, getDashboardStats, getOrderById, saveOrder, updateOrderStatus } from "../controllers/order.controller"
+import { generateOrderReportPDF, getAllOrders, getDashboardStats, getOrderById, saveOrder, updateOrderStatus } from "../controllers/order.controller"
 import { authenticate, isAdmin } from "../middleware/auth"
 
 const router = Router()
@@ -15,6 +15,7 @@ router.get(
   isAdmin,
   getDashboardStats
 )
+router.get("/report", generateOrderReportPDF)
 // GET /orders?status=PENDING&page=1&limit=5
 router.get("/", authenticate, isAdmin, getAllOrders)
 // order.routes.ts
