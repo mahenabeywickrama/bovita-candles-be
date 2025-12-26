@@ -127,6 +127,8 @@ export const getOrderById = async (req: Request, res: Response) => {
 
 export const getDashboardStats = async (_req: Request, res: Response) => {
   try {
+    /* ---------------- BASIC STATS ---------------- */
+
     const totalOrders = await Order.countDocuments()
     const pendingOrders = await Order.countDocuments({ status: Status.PENDING })
     const customers = await User.countDocuments({ role: "USER" })
@@ -138,52 +140,16 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
 
     const revenue = revenueAgg[0]?.total || 0
 
+    /* ---------------- RECENT ORDERS ---------------- */
+
     const recentOrders = await Order.find()
       .populate("user", "email")
       .sort({ createdAt: -1 })
       .limit(5)
 
-    const last7Days = new Date()
-    last7Days.setDate(last7Days.getDate() - 6)
-    last7Days.setHours(0, 0, 0, 0)
+    /* ---------------- ORDER STATUS COUNTS ---------------- */
 
-    // Orders per day
-    const ordersPerDay = await Order.aggregate([
-      {
-        $match: { createdAt: { $gte: last7Days } }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ])
-
-    // Revenue per day
-    const revenuePerDay = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: last7Days },
-          status: Status.CONFIRMED
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-          },
-          total: { $sum: "$totalAmount" }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ])
-
-    // Status breakdown
-    const statusBreakdown = await Order.aggregate([
+    const statusCounts = await Order.aggregate([
       {
         $group: {
           _id: "$status",
@@ -192,17 +158,138 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
       }
     ])
 
+    const orderStatusCounts = statusCounts.reduce(
+      (acc: Record<string, number>, item) => {
+        acc[item._id] = item.count
+        return acc
+      },
+      {
+        PENDING: 0,
+        CONFIRMED: 0,
+        SHIPPED: 0,
+        CANCELLED: 0
+      }
+    )
+
+    /* ---------------- DATE HELPERS ---------------- */
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - 6)
+    weekStart.setHours(0, 0, 0, 0)
+
+    /* ---------------- SNAPSHOTS ---------------- */
+
+    const ordersToday = await Order.countDocuments({
+      createdAt: { $gte: todayStart }
+    })
+
+    const revenueTodayAgg = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: todayStart },
+          status: Status.CONFIRMED
+        }
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+    ])
+
+    const revenueToday = revenueTodayAgg[0]?.total || 0
+
+    const ordersThisWeek = await Order.countDocuments({
+      createdAt: { $gte: weekStart }
+    })
+
+    const revenueThisWeekAgg = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: weekStart },
+          status: Status.CONFIRMED
+        }
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+    ])
+
+    const revenueThisWeek = revenueThisWeekAgg[0]?.total || 0
+
+    /* ---------------- ALERTS ---------------- */
+
+    const oldPendingOrders = await Order.countDocuments({
+      status: Status.PENDING,
+      createdAt: { $lt: todayStart }
+    })
+
+    const alerts: string[] = []
+
+    if (oldPendingOrders > 0) {
+      alerts.push(`${oldPendingOrders} orders pending for more than 24 hours`)
+    }
+
+    if (orderStatusCounts.CANCELLED > 10) {
+      alerts.push("High cancellation rate detected")
+    }
+
+    /* ---------------- ACTIVITY FEED ---------------- */
+
+    const activityFeed = recentOrders.map(order => {
+      return `Order #${order._id.toString().slice(-6)} ${order.status.toLowerCase()}`
+    })
+
+    /* ---------------- TOP PRODUCTS ---------------- */
+    // Assumes Order.items = [{ product, quantity }]
+
+    const topProductsAgg = await Order.aggregate([
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.product",
+          sold: { $sum: "$items.quantity" }
+        }
+      },
+      { $sort: { sold: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product"
+        }
+      },
+      { $unwind: "$product" },
+      {
+        $project: {
+          _id: 0,
+          name: "$product.name",
+          sold: 1
+        }
+      }
+    ])
+
+    /* ---------------- FINAL RESPONSE ---------------- */
+
     res.json({
       totalOrders,
       pendingOrders,
       customers,
       revenue,
-      recentOrders,
-      ordersPerDay,
-      revenuePerDay,
-      statusBreakdown
-    })
 
+      orderStatusCounts,
+      recentOrders,
+
+      alerts,
+      activityFeed,
+      topProducts: topProductsAgg,
+
+      snapshots: {
+        ordersToday,
+        revenueToday,
+        ordersThisWeek,
+        revenueThisWeek
+      }
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: "Dashboard fetch failed" })
