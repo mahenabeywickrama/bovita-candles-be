@@ -3,55 +3,60 @@ import { Request, Response } from "express"
 import { Order } from "../models/Order"
 
 export const initiatePayHere = async (req: Request, res: Response) => {
-  const order = await Order.findById(req.params.orderId)
-    .populate("user", "email")
-    .lean()
+  try {
+    const order = await Order.findById(req.params.orderId)
+      .populate("user", "email")
+      .lean()
 
-  if (!order) {
-    return res.status(404).json({ message: "Order not found" })
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    const merchantId = process.env.PAYHERE_MERCHANT_ID!
+    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET!
+
+    const amount = Number(order.totalAmount).toFixed(2)
+    const currency = "LKR"
+
+    const hash = crypto
+      .createHash("md5")
+      .update(
+        merchantId +
+          order._id +
+          amount +
+          currency +
+          crypto.createHash("md5").update(merchantSecret).digest("hex")
+      )
+      .digest("hex")
+      .toUpperCase()
+
+    const email =
+      typeof order.user === "object" && order.user !== null
+        ? (order.user as any).email
+        : "customer@example.com"
+
+    res.json({
+      merchant_id: merchantId,
+      return_url: `${process.env.FRONTEND_URL}/payment-success`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
+      notify_url: `${process.env.API_URL}/api/v1/payments/payhere/notify`,
+      order_id: order._id,
+      items: "Bovita Candles Order",
+      currency,
+      amount,
+      first_name: "Customer",
+      last_name: "",
+      email,
+      phone: "0000000000",
+      address: "N/A",
+      city: "N/A",
+      country: "Sri Lanka",
+      hash
+    })
+  } catch (err) {
+    console.error("PayHere init error:", err)
+    res.status(500).json({ message: "Payment init failed" })
   }
-
-  const merchantId = process.env.PAYHERE_MERCHANT_ID!
-  const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET!
-
-  const amount = order.totalAmount.toFixed(2)
-  const currency = "LKR"
-
-  const hash = crypto
-    .createHash("md5")
-    .update(
-      merchantId +
-        order._id +
-        amount +
-        currency +
-        crypto.createHash("md5").update(merchantSecret).digest("hex")
-    )
-    .digest("hex")
-    .toUpperCase()
-
-  const userEmail =
-    typeof order.user === "object" && order.user !== null
-      ? (order.user as any).email
-      : "customer@example.com"
-
-  res.json({
-    merchant_id: merchantId,
-    return_url: `${process.env.FRONTEND_URL}/payment-success`,
-    cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
-    notify_url: `${process.env.API_URL}/payments/payhere/notify`,
-    order_id: order._id,
-    items: "Order Payment",
-    currency,
-    amount,
-    first_name: "Customer",
-    last_name: "",
-    email: userEmail,
-    phone: "000000000",
-    address: "N/A",
-    city: "N/A",
-    country: "Sri Lanka",
-    hash
-  })
 }
 
 export const payHereNotify = async (req: Request, res: Response) => {
@@ -84,9 +89,11 @@ export const payHereNotify = async (req: Request, res: Response) => {
       return res.status(400).send("Invalid signature")
     }
 
+    // Status 2 = SUCCESS
     if (status_code === "2") {
       await Order.findByIdAndUpdate(order_id, {
-        status: "CONFIRMED"
+        status: "CONFIRMED",
+        paymentStatus: "PAID"
       })
     }
 
