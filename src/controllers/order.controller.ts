@@ -4,6 +4,7 @@ import { AuthRequest } from "../middleware/auth"
 import { Product } from "../models/Product";
 import { User } from "../models/User";
 import PDFDocument from "pdfkit"
+import { reduceStock, restoreStock } from "../utils/stock";
 
 export const saveOrder = async (req: AuthRequest, res: Response) => {
   try {
@@ -31,6 +32,12 @@ export const saveOrder = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: `Product not found: ${it.productId}` })
       }
 
+      if (p.stock < it.quantity) {
+        return res.status(400).json({
+          message: `Only ${p.stock} left for ${p.title}`
+        })
+      }
+
       itemsDetailed.push({
         product: p._id,
         title: p.title,
@@ -45,7 +52,7 @@ export const saveOrder = async (req: AuthRequest, res: Response) => {
       user: userId,
       products: itemsDetailed,
       totalAmount: total,
-      status: "PENDING"
+      status: Status.PENDING
     })
 
     const savedOrder = await order.save()
@@ -94,10 +101,45 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     const { orderId } = req.params
     const { status } = req.body
 
-    const order = await Order.findById(orderId)
+    if (!Object.values(Status).includes(status)) {
+      return res.status(400).json({ message: "Invalid status" })
+    }
 
+    const order = await Order.findById(orderId)
+    
     if (!order) {
       return res.status(404).json({ message: "Order not found" })
+    }
+
+    if (order.status === status) {
+      return res.status(400).json({ message: "Order already in this status" })
+    }
+
+    if (order.status === Status.SHIPPED && status === Status.CANCELLED) {
+      return res.status(400).json({
+        message: "Shipped orders cannot be cancelled"
+      })
+    }
+
+    if (status === Status.CONFIRMED) {
+      for (const item of order.products) {
+        await reduceStock(
+          item.product.toString(),
+          item.quantity
+        )
+      }
+    }
+
+    if (
+      status === Status.CANCELLED &&
+      order.status === Status.CONFIRMED
+    ) {
+      for (const item of order.products) {
+        await restoreStock(
+          item.product.toString(),
+          item.quantity
+        )
+      }
     }
 
     order.status = status
@@ -105,7 +147,9 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     res.json(order)
   } catch (error) {
-    res.status(500).json({ message: "Failed to update status" })
+    const message =
+      error instanceof Error ? error.message : "Stock update failed"
+    res.status(400).json({ message })
   }
 }
 
@@ -242,11 +286,12 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
     // Assumes Order.items = [{ product, quantity }]
 
     const topProductsAgg = await Order.aggregate([
-      { $unwind: "$items" },
+      { $match: { status: Status.CONFIRMED } },
+      { $unwind: "$products" },
       {
         $group: {
-          _id: "$items.product",
-          sold: { $sum: "$items.quantity" }
+          _id: "$products.product",
+          sold: { $sum: "$products.quantity" }
         }
       },
       { $sort: { sold: -1 } },
@@ -263,7 +308,7 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
       {
         $project: {
           _id: 0,
-          name: "$product.name",
+          name: "$product.title",
           sold: 1
         }
       }

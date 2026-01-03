@@ -26,7 +26,7 @@ const productSchema: Schema = new Schema<IProduct>({
     fragrance: { type: String },
     size: { type: String, required: true },
     price: { type: Number, required: true },
-    stock: { type: Number, default: 0 },
+    stock: { type: Number, required: true, min: 0 },
     imageUrls: { type: [String], required: true },
     createdAt: { type: Date, default: Date.now }
 });
