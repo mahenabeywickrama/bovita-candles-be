@@ -492,3 +492,14 @@ export const generateOrderReportPDF = async (
     res.status(500).json({ message: "Failed to generate PDF report" })
   }
 }
+
+export const getMyOrders = async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" })
+  }
+
+  const orders = await Order.find({ user: req.user.sub })
+    .sort({ createdAt: -1 })
+
+  res.json(orders)
+}
