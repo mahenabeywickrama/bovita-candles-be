@@ -131,6 +131,15 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     }
 
     if (
+      order.status === Status.CONFIRMED &&
+      status === Status.PENDING
+    ) {
+      return res.status(400).json({
+        message: "Confirmed orders cannot be reverted to pending"
+      })
+    }
+
+    if (
       status === Status.CANCELLED &&
       order.status === Status.CONFIRMED
     ) {
