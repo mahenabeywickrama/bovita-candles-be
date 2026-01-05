@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { generateOrderReportPDF, getAllOrders, getDashboardStats, getMyOrders, getOrderById, saveOrder, updateOrderStatus } from "../controllers/order.controller"
+import { generateOrderReportPDF, getAllOrders, getDashboardStats, getMyOrderById, getMyOrders, getOrderById, saveOrder, updateOrderStatus } from "../controllers/order.controller"
 import { authenticate, isAdmin } from "../middleware/auth"
 
 const router = Router()
@@ -13,6 +13,11 @@ router.get(
   "/my",
   authenticate,
   getMyOrders
+)
+router.get(
+  "/my/:id",
+  authenticate,
+  getMyOrderById
 )
 router.get(
   "/dashboard",

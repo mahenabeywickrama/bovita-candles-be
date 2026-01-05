@@ -503,3 +503,27 @@ export const getMyOrders = async (req: AuthRequest, res: Response) => {
 
   res.json(orders)
 }
+
+export const getMyOrderById = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.sub
+    const orderId = req.params.id
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: userId
+    })
+      .populate("products.product", "title imageUrls")
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    res.json(order)
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch order" })
+  }
+}
