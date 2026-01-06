@@ -28,12 +28,13 @@ The backend service for **Bovita Candles**, responsible for handling authenticat
 
 ---
 
-## 📸 Screenshots (API / Tools)
+## 📸 Screenshots
 
-> Example screenshots:
+### API Testing (Postman)
+![Postman](screenshots/postman.png)
 
-- Postman API testing: `screenshots/postman-products.png`
-- MongoDB collections: `screenshots/mongodb-collections.png`
+### Database (MongoDB)
+![MongoDB](screenshots/mongodb.png)
 
 ---
 
@@ -70,7 +71,7 @@ The backend API will be available at: `http://localhost:5000`
 
 ## 🌍 Deployment
 
-🔗 **Backend Live API:** [https://your-backend-deployment-url.com](https://your-backend-deployment-url.com)
+🔗 **Backend Live API:** [https://bovita-candles-be.vercel.app/](https://bovita-candles-be.vercel.app/)
 
 ---
 
