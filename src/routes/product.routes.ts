@@ -5,10 +5,6 @@ import { upload } from "../middleware/upload"
 
 const router = Router()
 
-router.options("/create", (req, res) => {
-  res.sendStatus(200)
-})
-
 router.post(
   "/create",
   authenticate,
